@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Funding Calls Scouting 2026 — UniBA</title>
+  <title>Funding Calls Scouting — UniBA Grant Office</title>
   <!-- Bootstrap Italia font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -286,6 +286,8 @@
     .card.urgency-medium::before { background: var(--yellow); }
     .card.urgency-low::before { background: var(--green); }
     .card.urgency-rolling::before { background: var(--purple); }
+    .card.urgency-expired::before { background: #c0c0c0; }
+    .card.urgency-expired { opacity: .65; }
 
     .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
     .card-title { font-size: 13px; font-weight: 700; color: var(--primary); line-height: 1.35; }
@@ -342,6 +344,26 @@
     .urgency-medium   .days-left { background: #fef8dc; color: #8a7000; }
     .urgency-low      .days-left { background: #e8f5ec; color: var(--green); }
     .urgency-rolling  .days-left { background: #ede8ff; color: var(--purple); }
+    .urgency-expired  .deadline  { color: #999; }
+    .urgency-expired  .days-left { background: #f0f0f0; color: #888; }
+
+    /* ── HIDE-EXPIRED TOGGLE ── */
+    .toggle-expired {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: rgba(255,255,255,.85);
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .toggle-expired input[type="checkbox"] {
+      accent-color: #FFD700;
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+    }
 
     .card-link {
       font-size: 11px; color: var(--primary);
@@ -415,8 +437,8 @@
   </a>
   <div class="header-divider"></div>
   <div class="header-title">
-    <h1>📡 Funding Calls Scouting 2026</h1>
-    <p>Active project calls — European · National Italy · Regional Puglia</p>
+    <h1>📡 Active Funding Calls — Scouting Dashboard</h1>
+    <p>European · National Italy · Regional Puglia — continuously updated</p>
   </div>
   <span class="last-update">⟳ 13 March 2026</span>
 </header>
@@ -456,7 +478,12 @@
     <option value="medium">🟡 Upcoming (&lt;90 days)</option>
     <option value="low">🟢 Long-term</option>
     <option value="rolling">🟣 Rolling / Open</option>
+    <option value="expired">⚫ Expired / Closed</option>
   </select>
+  <label class="toggle-expired" for="hideExpiredCheck" title="Hide calls whose deadline has passed">
+    <input type="checkbox" id="hideExpiredCheck" checked onchange="applyFilters()">
+    Hide expired
+  </label>
   <button class="btn-reset" onclick="resetFilters()">✕ Reset</button>
 </div>
 
@@ -473,6 +500,7 @@
   <span class="legend-item"><span class="legend-dot" style="background:var(--yellow)"></span> &lt;90 days</span>
   <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span> Over 90 days</span>
   <span class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span> Rolling / Open</span>
+  <span class="legend-item"><span class="legend-dot" style="background:#c0c0c0"></span> Expired / Closed</span>
 </div>
 
 <!-- Stats bar -->
@@ -480,7 +508,8 @@
   <div class="stat"><span class="stat-dot d-red"></span><span class="stat-count c-red" id="sc-critical">0</span><span>urgent</span></div>
   <div class="stat"><span class="stat-dot d-orange"></span><span class="stat-count c-orange" id="sc-high">0</span><span>imminent</span></div>
   <div class="stat"><span class="stat-dot d-blue"></span><span class="stat-count c-blue" id="sc-total">0</span><span>calls visible</span></div>
-  <span class="stat-total" id="sc-label">of 0 total</span>
+  <div class="stat"><span class="stat-dot" style="background:#c0c0c0"></span><span class="stat-count" style="color:#888" id="sc-expired">0</span><span>expired</span></div>
+  <span class="stat-total" id="sc-label">of 0 active</span>
 </div>
 
 <main id="mainContent">
@@ -489,7 +518,7 @@
   <div class="section" id="sec-horizon" data-category="europeo">
     <div class="section-header">
       <span class="section-icon">🌐</span>
-      <h2>Horizon Europe 2026</h2>
+      <h2>Horizon Europe</h2>
       <span class="section-count" id="cnt-horizon"></span>
     </div>
     <div class="cards-grid">
@@ -841,7 +870,7 @@
   <div class="section" id="sec-life" data-category="europeo">
     <div class="section-header">
       <span class="section-icon">🌿</span>
-      <h2>LIFE Programme 2026</h2>
+      <h2>LIFE Programme</h2>
       <span class="section-count" id="cnt-life"></span>
     </div>
     <div class="cards-grid">
@@ -1232,13 +1261,23 @@
 (function() {
   'use strict';
 
-  const TODAY = new Date('2026-03-13');
+  const TODAY = new Date();   // always current date — auto-updated by GitHub Actions
+
+  // Dynamically update displayed dates
+  var _months = ['January','February','March','April','May','June',
+                 'July','August','September','October','November','December'];
+  var _disp = TODAY.getDate() + ' ' + _months[TODAY.getMonth()] + ' ' + TODAY.getFullYear();
+  var _topbarDate = document.querySelector('.topbar span:last-child');
+  if (_topbarDate) _topbarDate.textContent = '\u27F3 Updated: ' + _disp;
+  var _lastUpd = document.querySelector('.last-update');
+  if (_lastUpd) _lastUpd.textContent = '\u27F3 ' + _disp;
 
   function daysDiff(iso) {
     return Math.ceil((new Date(iso) - TODAY) / 86400000);
   }
 
   function urgencyClass(days) {
+    if (days < 0)    return 'urgency-expired';
     if (days <= 15)  return 'urgency-critical';
     if (days <= 45)  return 'urgency-high';
     if (days <= 90)  return 'urgency-medium';
@@ -1280,7 +1319,7 @@
     var dlEl = card.querySelector('.days-left[id]');
     if (dlEl && deadlines[dlEl.id]) {
       var days = daysDiff(deadlines[dlEl.id]);
-      dlEl.textContent = days <= 0 ? 'expired' : days === 1 ? '1 day' : days + 'd';
+      dlEl.textContent = days < 0 ? 'expired' : days === 0 ? 'today!' : days === 1 ? '1 day' : days + 'd';
       // Strip all urgency classes then reapply from date
       card.className = card.className.replace(/urgency-\S+/g, '').trim();
       card.classList.add(urgencyClass(days));
@@ -1300,7 +1339,9 @@
   var searchStrings = cards.map(buildSearchString);
 
   function updateStats() {
-    var visible = cards.filter(function(c) { return !c.classList.contains('hidden'); });
+    var visible  = cards.filter(function(c) { return !c.classList.contains('hidden'); });
+    var expired  = cards.filter(function(c) { return c.classList.contains('urgency-expired'); });
+    var active   = cards.filter(function(c) { return !c.classList.contains('urgency-expired'); });
     var critical = 0, high = 0;
     visible.forEach(function(c) {
       if (c.classList.contains('urgency-critical')) critical++;
@@ -1309,7 +1350,8 @@
     document.getElementById('sc-critical').textContent = critical;
     document.getElementById('sc-high').textContent     = high;
     document.getElementById('sc-total').textContent    = visible.length;
-    document.getElementById('sc-label').textContent    = 'of ' + cards.length + ' total';
+    document.getElementById('sc-expired').textContent  = expired.length;
+    document.getElementById('sc-label').textContent    = 'of ' + active.length + ' active';
 
     document.querySelectorAll('.section').forEach(function(sec) {
       var cntEl   = sec.querySelector('.section-count');
@@ -1328,18 +1370,26 @@
     var terms   = query.split(/\s+/).filter(Boolean);
     var catF    = document.getElementById('categoryFilter').value;
     var urgF    = document.getElementById('urgencyFilter').value;
+    var hideExpEl = document.getElementById('hideExpiredCheck');
+    var hideExp   = hideExpEl ? hideExpEl.checked : true;
 
     // Show/hide search hint
     document.getElementById('searchHint').classList.toggle('visible', raw.length > 0);
 
+    // When "Expired" is explicitly selected in dropdown, auto-uncheck hideExpired visually
+    // (the filter itself handles showing expired cards correctly)
+
     cards.forEach(function(card, i) {
-      var cat   = card.getAttribute('data-category') || '';
+      var cat    = card.getAttribute('data-category') || '';
+      var isExp  = card.classList.contains('urgency-expired');
       var matchCat = !catF || cat === catF;
       var matchUrg = !urgF || card.classList.contains('urgency-' + urgF);
       var matchKw  = terms.length === 0 || terms.every(function(t) {
         return searchStrings[i].indexOf(t) !== -1;
       });
-      card.classList.toggle('hidden', !(matchCat && matchUrg && matchKw));
+      // Hide expired cards unless: toggle is off, OR user explicitly chose "expired" in dropdown
+      var matchExp = (urgF === 'expired') ? isExp : (!hideExp || !isExp);
+      card.classList.toggle('hidden', !(matchCat && matchUrg && matchKw && matchExp));
     });
 
     updateStats();
@@ -1349,6 +1399,8 @@
     document.getElementById('searchInput').value       = '';
     document.getElementById('categoryFilter').value    = '';
     document.getElementById('urgencyFilter').value     = '';
+    var hideExpEl = document.getElementById('hideExpiredCheck');
+    if (hideExpEl) hideExpEl.checked = true;
     applyFilters();
   }
 
@@ -1357,8 +1409,9 @@
   document.getElementById('categoryFilter').addEventListener('change', applyFilters);
   document.getElementById('urgencyFilter').addEventListener('change', applyFilters);
 
-  // Expose resetFilters to onclick
-  window.resetFilters = resetFilters;
+  // Expose functions to onclick/onchange handlers
+  window.resetFilters  = resetFilters;
+  window.applyFilters  = applyFilters;
 
   // Init
   applyFilters();
