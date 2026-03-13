@@ -1,0 +1,47 @@
+name: Auto-update displayed date
+
+# Runs every 12 hours (06:00 and 18:00 UTC = ~08:00 and 20:00 Italian time)
+# Also runnable manually from GitHub → Actions tab
+on:
+  schedule:
+    - cron: '0 6,18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-date:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update date strings in index.html
+        run: |
+          # Format: "13 March 2026"
+          DISPLAY=$(LC_ALL=en_US.UTF-8 date -u +"%d %B %Y")
+          # Remove leading zero from day (e.g. "03" → "3")
+          DISPLAY=$(echo "$DISPLAY" | sed 's/^0//')
+
+          echo "Setting date to: $DISPLAY"
+
+          # Update topbar: ⟳ Updated: DD Month YYYY
+          sed -i "s/⟳ Updated: [0-9][0-9]* [A-Za-z]* [0-9]\{4\}/⟳ Updated: $DISPLAY/g" index.html
+
+          # Update header last-update span: ⟳ DD Month YYYY
+          sed -i "s/⟳ [0-9][0-9]* [A-Za-z]* [0-9]\{4\}/⟳ $DISPLAY/g" index.html
+
+      - name: Commit and push if date changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          # Only commit if index.html actually changed
+          if git diff --staged --quiet; then
+            echo "No changes — date already up to date."
+          else
+            git commit -m "chore: auto-update displayed date to $(date -u +%Y-%m-%d)"
+            git push
+          fi
